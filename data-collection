@@ -1,0 +1,518 @@
+---
+title: "Data Collection Cheat Sheet"
+author: "Jaspreet Singh | Jonathan Karl"
+output: html_document
+---
+
+## Setup Code
+
+Add all required packages in the 'pkgs' list. The code will import all packages and/or install them if not installed.
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+# Loading/installing required packages
+pkgs <- c("tidyverse", 
+          "dplyr", 
+          "openxlsx",
+          "lubridate",
+          "visdat",
+          "ggplot2")
+
+miss_pkgs <- pkgs[!pkgs %in% installed.packages()[,1]] # vector of missing packages
+
+# Installing the missing packages
+invisible(
+  if(length(miss_pkgs)>0){
+    install.packages(miss_pkgs)
+    }
+)
+
+# Loading all the packages
+invisible(lapply(pkgs,library,character.only=TRUE))
+rm(miss_pkgs)
+rm(pkgs)
+```
+
+## Import Sample Dataset
+
+This code utilises the Titanic demo files from the Analyst training to provide anchored sample code which can be modified to suit different data sets.
+
+### Legend and Notes\
+
+1. In all code examples, 'df' refers to the data set being cleaned/analyzed while 'var[1-5]' refers to the variables under consideration for particular line of code. 
+
+2. Not all functions can be run on this sample, in which case the code has been commented out. You can copy out the code to your file and remove the commenting #.
+
+3. After each code block which modifies the original data set, data frame is refreshed using "df <- df_raw" command. Please ignore this and accompanying commands as they just facilitate the code flow. 
+
+4. To suppress unnecessary coding output messages (such as "NAs coerced"), some commands have been wrapped inside the invisible() function. To utilize this code, copy out the indented code inside the function brackets.
+
+### Importing Demo Files
+
+Follow the steps below to import the demo file from Box. [IMPORTANT: LINK NEEDS TO BE UPDATED BEFORE MAKING THE FILE LIVE]
+
+This code also serves as genearl template to import files from CSV, Excel and Stata formats on to R - the most common two formats we deal with at Busara
+
+
+```{r raw, include=TRUE}
+# Import titanic dataset if working directory is not set [UPDATE LINK]
+  df_raw <- read.csv("/Users/jaspreetsingh/Documents/Data Driven Busara/Code Repository/Titanic_Data.csv")
+  
+# Creating dummy named variables
+  df_raw$var1 <- df_raw$fare
+  df_raw$var2 <- df_raw$age
+  df_raw$var3 <- df_raw$passengerid
+  df_raw$var4 <- df_raw$sex
+
+# View Data
+  View(df_raw)
+```
+
+## Set Working Directory
+
+Using a working directory is a standard practice that ensures that all your work in located in the same place and avoids repeating long path names throughout your code by anchoring the common folder. For the rest of the document, we will only need to 
+
+For more comfortable R users and coders, it also offers an easy route to navigate folder hierarchy. See: https://www.geeksforgeeks.org/get-and-set-working-directory-in-r/
+
+
+```{r workdir, include=TRUE}
+
+# Set up a working directory 
+  setwd("/Users/jaspreetsingh/Documents/Data Driven Busara/Code Repository")
+  
+# Check if working directory has been set up properly
+  getwd()
+  
+# Check what files are in your working directory
+  dir()
+```
+
+## Importing Files from common data formats
+
+This code serves as general template to import files from CSV, Excel and Stata formats on to R.
+
+
+```{r import, include=TRUE}
+
+# Importing from csv  
+  df_csv <- read.csv("Titanic_Data.csv")
+
+# Importing from Excel workbook xlsx format using the openxlsx library 
+#  df_xlsx <- read.xlsx("/Users/jaspreetsingh/Documents/Data Driven Busara/Code Repository/Titanic_Data.xlsx")
+  
+# Importing from Stata .dta format using the haven
+#  require(haven)
+#  df_dta <- read_dta("/Users/jaspreetsingh/Documents/Data Driven Busara/Code Repository/Titanic_Data.dta")
+
+# Importing from R .rds format 
+#  df_rds <- readRDS("/Users/jaspreetsingh/Documents/Data Driven Busara/Code Repository/Titanic_Data.rds")
+
+```
+
+## Exporting Files to common data formats
+
+Saving data in .xlsx, .csv, .dta and .rds formats. Note: RDS is a R-specific data storage format which is highly compact and useful for large datasets. You can set the file name directly in the file path for all options.
+
+
+```{r export, include=TRUE}
+
+# Exporting to csv
+  # write.csv(dataset_name, 
+  #            "/Users/jaspreetsingh/Documents/Data Driven Busara/Code Repository/Titanic.csv", 
+  #            fileEncoding = "UTF-8")
+
+# Export to Excel
+  # write.xlsx(dataset_name, 
+  #            "/Users/jaspreetsingh/Documents/Data Driven Busara/Code Repository/Titanic.xlsx", 
+  #            fileEncoding = "UTF-8")
+  
+# Export to Stata .dta format using the foreign package
+  # reequire(foreign)
+  # write.xlsx(dataset_name,
+  #            "/Users/jaspreetsingh/Documents/Data Driven Busara/Code Repository/Titanic.dta")
+
+# Export to R .rds format using the foreign package
+  # saveRDS(dataset_name,
+  #         "/Users/jaspreetsingh/Documents/Data Driven Busara/Code Repository/Titanic.rds")
+  
+
+```
+
+## Basic Operations 1: Counts, Duplicates, Missing UIDs, Missing Data
+
+### Counts
+
+Counts of the survey with multiple circumstances
+
+```{r Counts, include=TRUE}
+
+df <- df_raw #resetting dataframe
+
+# Checking survey counts - total rows in data frame
+  nrow(df)
+
+# Count total rows with no missing values in ANY column of data frame
+  nrow(na.omit(df))
+
+# Count total rows with no missing values in specific column of data frame - useful for primary outcome variables where you don't want missing data for any observation
+  nrow(df[!is.na(df$var1),])
+  
+# Count by a grouping variable (like treatment condition and gender) using the dplyr libraryr
+  df %>% count(var4, sort=TRUE) # setting sort defines the order of the displayed table
+  
+```
+
+### Duplicates
+
+It is important to understand Why duplicates are present in the data set and which instance of the duplicates needs to be eradicated. The recommended workflow for this would be:
+
+Step 1: Identify duplicates and do a visual check of entries
+
+Step 2: Understand why duplicates exist and which ones need to be dropped from the dataset
+
+Step 3: Drop the selected duplicates that you want to drop. It is also advisable to document which duplicates were dropped and why and chart out next steps to prevent them from occurring - modifications to data management, field enumerator training etc.
+
+```{r Duplicates, include=TRUE}
+
+# Identify and Drop Duplicate Rows (Perfect Duplicates)
+
+  df <- df_raw #resetting dataframe
+  
+# Check for duplicates in the dataset (creates a binary variable for duplicate rows)
+  invisible(
+    duplicated(df)
+    )
+
+# Count number of duplicated variables
+  invisible(
+    sum(duplicated(df))
+    )
+
+# View duplicate observations - visual checks are important understand why the dataset contains duplicates and which ones need to be dropped
+  #View(df[duplicated(df), ])
+  
+# Remove duplicated observations (repeated rows)
+  df <- df[!duplicated(df), ]
+  
+# Identify and Drop Duplicate IDs
+
+  df <- df_raw #resetting dataframe
+  
+# Check for duplicates in the dataset by var1 <insert variable name>
+  invisible(
+    duplicated(df$var1)
+    )
+  
+# Remove identified duplicates by var3 <insert variable name> (in each instance, the first observation is kept)
+  df <- df[!duplicated(df$var3), ]
+```
+
+### Missing UIDs
+
+If you have a list of unique IDs (UID) from sample identification / case management, it is useful to track missing UIDs from the collected data.
+
+```{r missuid, include=TRUE}
+
+  df <- df_raw #resetting dataframe
+
+# Creating dummy list of UIDs
+  uid_list <- c(df$passengerid, "1047", "6523", "5634", "1264", "4523")
+
+# Checking for missing UIDs
+  uid_list_miss <- subset(uid_list, !(uid_list %in% df$passengerid)) # uid_list: UIDs from identification; passengerid: UIDs from data collection
+  uid_list_miss
+  
+```
+
+### Missing Data
+
+At the data collection stage, missing data is a very good indicator of data quality and can be used to reflect on instrument quality, enumerator quality, issues with flow etc. It is important to assign the right meaning to the presence of missing data and make the right modifications to data collection process.
+
+```{r Missing, include=TRUE}
+
+  df <- df_raw #resetting dataframe  
+
+# Creating a dataframe with counts of missing values for each column
+  na_count <-sapply(df, function(y) sum(length(which(is.na(y)))))
+  na_count <- data.frame(na_count)
+  na_count
+
+# Visualizing missing data in your data frame - helps you visualise relations between variables
+  require(visdat) # Install if not already installed
+  vis_dat(df)
+  
+# Visualize and record % missing values for each variable  
+  vis_miss(df)
+  
+# Visualize missing values for key outcome variables  
+  df_outcome_vars <- df %>% select(var1, var2, var3)
+  
+  # function convert dataframe to binary TRUE/FALSE matrix
+  toBinaryMatrix <- function(df){
+  m<-c()
+  for(i in colnames(df)){
+      x<-sum(is.na(df[,i]))
+      # missing value count
+      m<-append(m,x)
+      # non-missing value count
+      m<-append(m,nrow(df)-x) 
+  }
+    
+  # adding column and row names to matrix
+  a<-matrix(m,nrow=2)
+  rownames(a)<-c("TRUE","FALSE")
+  colnames(a)<-colnames(df_outcome_vars)
+    
+  return(a)
+  }
+    
+  # function call
+  binMat = toBinaryMatrix(df_outcome_vars)
+  binMat
+  
+  # stacked barplot for missing data in all columns
+  barplot(binMat,
+  main = "Missing values in key variables",xlab = "Frequency",
+  col = c("#00A6E0","#40B6B7"))
+    
+  # legend for barplot
+  legend("topright",
+  c("Missing values","Non-Missing values"),
+  fill = c("#00A6E0","#40B6B7"))
+```
+
+## Basic Operations 2: Clean / Replace / Drop Observations
+
+These will come in handy to handle data discrepancies that show up in the High Frequency and Back Checks. The most important element here is the "condition" that is used to identify problematic observations. Practicing condition expressions in R would be very helpful to execute these operations.
+
+```{r clean, include=TRUE}
+
+  df <- df_raw #resetting dataframe  
+
+# Manual (General Case): Each edit instance can be referred by column name and observation number as shown:
+  df$sex[13] <- "male" # here sex is the name of column, 13 is the observation number
+  df$var2[250] <- 40
+
+# Conditional (General Case)): Edits can be made by condition of variables as well
+  df$age[df$age > 50] <- 50 # for all age entries above 50, replace all ages by 50. Useful for all sorts of numbers
+  df$age[is.numeric(as.character((df$age)))] <- NA # Replace all age entries which are not numeric by missing entries
+
+## Examples:  
+  
+# Negative Values
+  
+  df <- df_raw #Ignore resetting dataframe  
+
+# Convert Negative Values to Zero (for any other character, replace the second 0 in the code with the desired character)
+  df$var1 <- ifelse(df$var1 < 0, 0, df$var1)
+
+  df <- df_raw #Ignore resetting dataframe  
+  
+# Convert Negative Values to Missing (for any other character, replace the second 0 in the code with the desired character)
+  df$var1 <- ifelse(df$var1 < 0, NA, df$var1)
+
+# Non-numeric characters in a numeric variable
+  
+  df <- df_raw #Ignore resetting dataframe  
+  df$var4 <- df$ticket # Ignore renaming variable
+  
+  # Replace non-numeric entry with NA (coerce the variable into numeric type)
+  invisible(
+    df$var4 <- lapply(df$var4, function(x) as.numeric(as.character(x)))
+    )
+  
+  df$var4 <- df$ticket # Ignore renaming variable
+  
+  # Remove non-numeric characters from all observation ("x234abc12" -> 23412)
+  df$var4 <- as.numeric(gsub("\\D+", "", df$var4))
+  
+# Change incorrect values that are not answer choices to missings
+  df$survived[df$survived > 1] <- NA
+  
+  df$var4 <- df$ticket # Ignore renaming variable
+  
+# Remove specific string entries in numeric columns [Eg.Remove all A's]
+  df$var4 <- str_remove(df$var4, "A")
+  
+  df$var5 <- df$embarked # Ignore renaming variable
+  
+# Remove unwanted characters from all observations of a variable (removes '\' in the variable)
+  df$var5 <- str_remove_all(df$var5, "\\\\")
+  
+# Replace values in certain observations [Eg. Change all values that are under 20 to 0]
+  df$var1[df$var1 < 20] <- 0
+
+## Dropping observations  
+  
+# Dropping observations manually
+  df <- df[-c(2,50,235),] # dropping rows 2, 50 and 235 from the dataset
+  df <- df[-c(4:nrow(df)),] # dropping last 4 rows
+  
+# Dropping observations conditionally
+  df <- df[df$age < 50,] # keeping observations where age is less than 50 (others are dropped)
+  df <- df[df$survived <= 1,] # keeping observations where a dummy variable has a valid response
+  df <- df[df$sibsp <= 4,] # keeping observations where a categorical variable has a valid response
+```
+
+## High Frequency Checks
+
+HFCs are checks of incoming data conducted on a regular basis (ideally daily). High-frequency checks can be run on survey data or administrative data. [Poverty Action Lab]
+
+This section consists of a non-exhaustive list of common HFC operations, intended to serve as building blocks of HFCs. You can use this to construct your code as HFCs are often very specific to the survey instrument.
+
+
+```{r hfc, include=TRUE}
+
+# Consent Check
+  table(df$consent) # table frequency of consent responses
+  df <- df[df$consent == 1,] # drop individuals who did not give consent
+
+# Eligibility Checks - say you only want women (dummy / categorical variable) and between ages 18 - 26 (numerical variable) in the sample
+  nrow(df[df$sex == 1,]) # number of observations with women (gender dummy set to 1 for women)
+  nrow(df[(df$age < 27 & df$age > 17),]) # number of observations with age within expected range
+  
+  df[df$sex == 0,] # see number of observations which have men (in case eligibility check for gender failed)
+  df[(df$age >= 27 & df$age <= 17),] # see number of observations which fail the age eligibility criteria
+  
+# Surveys Completed - Checks if a few mandatory questions towards the end were answered
+  sum(sapply(df[,"var1"], function(x) sum(is.na(x)))) == 0
+  sum(sapply(df[,"var2"], function(x) sum(is.na(x)))) == 0
+  sum(sapply(df[,"var3"], function(x) sum(is.na(x)))) == 0
+  
+  df[(is.na(df$var1) | is.na(df$var2) | is.na(df$var3)),] # see observations with missing data in key mandatory variables
+
+# Survey Duration - visual checks and spread on survey duration variable
+  hist(df$duration) # histogram showing of survey response time - focus on really high and really low response times
+  
+  df_fail <- df %>% filter(abs(scale(df$duration))>2) # filters observations more than 2 standard deviations away from mean response time
+  
+# Values within Range - Likert scale and other numero-categorical variables
+  df_check <- df %>% filter(!(var1 > 0 & var1 < 5) | is.number(var1)) # checks if a 5 point likert scale response is apt
+  
+# Unlikely numerical values - for all numerical variables, it is prudent to manually check all values more than 3SDs away from mean
+  df_fail <- df %>% filter(abs(scale(df$age))>3) # Being far away from mean is not necessarily bad and should be evaluated by case
+  nrow(df_fail) == 0 # should return TRUE
+  
+# Typos - for questions like likert scale and other numerical entries expected to be within a set range
+  df_check <- df %>% filter(sibsp < 0 & sibsp > 2) # sibsp can only take values 0,1,2; so any other entry would be a typo
+  nrow(df_check) == 0 # should return TRUE
+
+  df_check <- df %>% filter(!(is.numeric(age))) # for any age entries which are not numerical
+  nrow(df_check) == 0 # should return TRUE
+  
+  df_check <- df %>% filter(!(is.integer(age))) # for any age entries which are not whole numbers
+  nrow(df_check) == 0 # should return TRUE
+  
+# Conditional Checks - checks on question responses contional on other responses
+  df_check <- df %>% filter(var1 == "Others" & is.na(var1$others)) # for questions where other Others is used but not elaborated
+  nrow(df_check) == 0 # should return TRUE
+  
+  df_check <- df %>% filter(var1 == 1 & (var2 == 5 | var2 == 6)) # if var2 can only take certain values (0-4) based on var1
+  nrow(df_check) == 0 # should return TRUE
+  
+# Response bias - if respondents are selecting the same response on consecutive likert-type answers (quality check)
+  likert_group1 <- c("Q1.1", "Q1.2", "Q1.3", "Q1.4") # create group of consecutive likert questions which appear together on the response screen 
+  df$likertgroup1 <- apply(df[likert_group1], 1, function(x)length(unique(x))) # creates a variable defining number of unique likert responses for the group per participant
+  df_check <- df %>% filter(likertgroup1 == 1) # filters respondents which have given the same response for all questions (can be set to 2 or more depending on quality bracket)
+  nrow(df_check) == 0 # should return TRUE
+  
+# Enumerator level checks
+  df_enum_consent <- df %>% group_by(enum) %>% summarise(num_consent = sumif(consent == 1)) # number of positive consent per enumerator
+  
+  df_enum_completed <- df %>% group_by(enum) %>% summarise(num_completed = sumif(completed == 1)) # number of completed surveys per enumerator, assumes a dummy variable for complete survey
+  
+  df_enum_duration <- df %>% group_by(enum) %>% summarise(avg_duration = mean(duration, na.rm = T)) %>% arrange(desc(avg_duration)) # survey duration by enumerator
+  
+  df_enum_na <- df %>% group_by(enum) %>% select(var1, var2, var3) %>% summarise_all(list(function(x){sum(is.na(x))})) # count of NAs for important mandatory variables to ascertain data collection quality
+  
+# Productivity checks
+  df_prod_total <- df %>% arrange(surveydate) %>% group_by(surveydate) %>% summarise(surveydate_n = n()) # total number of surveys done per day
+  
+  df_prod_avg <- df %>% arrange(surveydate) %>% group_by(surveydate) %>% summarise(surveydate_n = n(), enum_num = length(unique(enum), daily_avg = surveydate_n/enum_num)) # average number of surveys done per day per enumerator
+  
+  df_enum_prod <- df %>% group_by(enum) %>% summarise(days_worked = length(unique(surveydate)), total_surveys_done = n(), daily_average = total_surveys_done/days_worked) %>% arrange(total_surveys_done) # surveys done per day by each enumerator
+```
+
+## Merging Datasets and Running Back Checks
+
+### Merging Datasets
+
+Before merging, ensure that you know the right variable to merge on. The first data frame (df1) is the base and all variables from the same will show first in the merged dataset followed by those selected observations from the second data frame (df2) which map on to the the 'var_id's from df1. 
+
+R's merge() command accommodates all three - one-to-one, one-to-many and many-to-many relationships, which the language manages on it's own. It is advisable to understand both the datasets to be merged properly and understand which join works best for you.
+
+Here's an useful Stack Overflow thread which also defines these joins:
+
+https://stackoverflow.com/questions/1299871/how-to-join-merge-data-frames-inner-outer-left-right#:~:text=Inner%20join%3A%20merge(df1%2C,x%20and%20by.
+
+```{r merge, include=TRUE}
+
+# Merge columns of two datasets with tiles df1 and df2 with common variable 'var_id' - Code won't run with the current sample data set
+
+  # df_merged <- merge(df1, df2, by = "var_id") # Inner Join  
+
+  # df_merged <- merge(df1, df2, by = "var_id", all = TRUE) # Outer Join
+
+  # df_merged <- merge(df1, df2, by = "var_id", all.x = TRUE) # Left Join
+
+  # df_merged <- merge(df1, df2, by = "var_id", all.y = TRUE) # Right Join
+
+# Merge columns of two datasets with tiles df1 and df2 with more than one common variable, say 'var_id1', 'var_id2', 'var_id3' - Code won't run with the current sample data set
+
+  # df_merged <- merge(df1, df2, by = c("var_id1","var_id2","var_id3")) # Inner Join  
+
+  # df_merged <- merge(df1, df2, by = c("var_id1","var_id2","var_id3"), all = TRUE) # Outer Join
+
+  # df_merged <- merge(df1, df2, by = c("var_id1","var_id2","var_id3"), all.x = TRUE) # Left Join
+
+  # df_merged <- merge(df1, df2, by = c("var_id1","var_id2","var_id3"), all.y = TRUE) # Right Join
+
+# Appending Rows (used in cases where rows from 2 datasets WITH SAME NAME AND NUMBER OF COLUMNS need to be to added to the same dataset)
+
+  # df_merged <- rbind(df1, df2) 
+```
+
+### Running Backchecks
+
+A back-check is when previously-interviewed respondents are re-interviewed by a new enumerator using a shortened version of the original survey. The responses to the back-checked survey are then compared to the respondent's original responses to detect discrepancies.
+
+To run this in R, we start with two separate datasets, the original data collected and the subset data selected for back checks. We assume that both have a common UID for matching. 
+
+
+```{r backchecks, include=TRUE}
+
+  df <- df_raw #resetting dataframe  
+
+# Creating a random subset of the sample for back checks - assuming the researcher wants to call back 10% of sample for back checks
+  df_check <- df %>% sample_n(0.1*nrow(df)) %>% select(passengerid, var1, var2) # tweak 0.1 (10%) to select a larger/smaller subset
+  
+# Creating discrepancies for coding purposes - ignore
+  df_check[3,3] <- 37
+  df_check[17,2] <- 8.25
+
+# Merge back check data set with the main dataset
+  df_bc <- merge(df, df_check, by = "passengerid")
+
+# Filter out and view observations which fail the back checks - assumes BOTH versions of the variables are NOT missing
+  df_bc_fail <- subset(df_bc, (df_bc$var1.x != df_bc$var1.y | df_bc$var2.x != df_bc$var2.y)) # can be extended to multiple variables 
+  View(df_bc_fail)
+```
+
+## Extracting PII from Data and Storing it Separately
+
+After data collection, the very first step should be to remove any Personally Identifiable Information (PII) from the dataset and working on a new copy with just anonymised UIDs. Important: Make sure the dataset has UIDs attached to all observations before removing PIIs. If not, add UIDs first. 
+
+The original data (with PII) should be in a secure location with authorized-only access. All analysis and data sharing should be limited to the anonymised dataset.
+
+```{r PII, include=TRUE}
+
+  df <- df_raw #resetting dataframe  
+
+# Generate random and unique 5-digit UIDs for each observation
+  set.seed(12345) # Do not change this number after running the code for the first time
+  df$uid <- sample(10000:99999, nrow(df))
+  
+
+# De-identify the dataset by creating a new dataset without the PII variables (name used in this case)
+  df_new <- subset(df, select = -c(name))
+```
