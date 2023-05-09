@@ -1,0 +1,478 @@
+---
+title: "Data Cleaning Cheat Sheet"
+author: "Jaspreet Singh | Dhwani Yagnaraman | Kriti Chouhan"
+output: html_document
+---
+
+```{r, include= FALSE}
+defaultW <- getOption("warn")
+options(warn = -1)
+```
+
+## Setup Code
+
+Add all required packages in the 'pkgs' list. The code will import all packages and/or install them if not installed.
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+# Loading/installing required packages
+pkgs <- c("tidyverse", 
+          "dplyr", 
+          "openxlsx",
+          "lubridate",
+          "ggplot2")
+
+miss_pkgs <- pkgs[!pkgs %in% installed.packages()[,1]] # vector of missing packages
+
+# Installing the missing packages
+invisible(
+  if(length(miss_pkgs)>0){
+    install.packages(miss_pkgs)
+    }
+)
+
+# Loading all the packages
+invisible(lapply(pkgs,library,character.only=TRUE))
+rm(miss_pkgs)
+rm(pkgs)
+```
+
+## Import Sample Dataset
+
+This code utilises the Titanic demo files from the Analyst training to provide anchored sample code which can be modified to suit different data sets.
+
+### Legend and Notes\
+
+1. In all code examples, 'df' refers to the data set being cleaned/analyzed while 'var[1-5]' refers to the variables under consideration for particular line of code. 
+
+2. Not all functions can be run on this sample, in which case the code has been commented out. You can copy out the code to your file and remove the commenting #.
+
+3. After each code block which modifies the original data set, data frame is refreshed using "df <- df_raw" command. Please ignore this and accompanying commands as they just facilitate the code flow. 
+
+4. To suppress unnecessary coding output messages (such as "NAs coerced"), some commands have been wrapped inside the invisible() function. To utilize this code, copy out the indented code inside the function brackets.
+
+### Importing Demo Files
+Follow the steps below to import the demo file from Box. [IMPORTANT: LINK NEEDS TO BE UPDATED BEFORE MAKING THE FILE LIVE]
+
+
+```{r import, include=TRUE}
+# Import titanic dataset if working directory is not set [UPDATE LINK]
+  df_raw <- read.csv("/Users/jaspreetsingh/Downloads/Titanic_Data.csv")
+  
+# Creating dummy named variables
+  df_raw$var1 <- df_raw$fare
+  df_raw$var2 <- df_raw$age
+  df_raw$var3 <- df_raw$passengerid
+
+# View Data
+  # View(df_raw)
+```
+
+## Cleaning Dataset
+
+### Dropping/keeping variables
+
+Drop / Retain a group of variables as needed
+
+```{r Drop Variables, include=TRUE}
+## METHOD 1: Dropping variables from the dataset
+  
+  df <- df_raw #resetting dataframe
+
+  # Add the list of variables to drop in the following list
+  vars_to_drop <- c('var1','var2','var3')
+  
+  df <- df %>% select(-all_of(vars_to_drop))
+  
+## METHOD 2: Keeping variables from the dataset
+  
+  df <- df_raw #resetting dataframe
+  
+  # Add the list of variables to keep in the following list
+  vars_to_keep <- c('var1','var2','var3')
+  
+  df <- df %>% select(all_of(vars_to_keep))
+```
+
+### Duplicates
+
+It is important to understand Why duplicates are present in the data set and which instance of the duplicates needs to be eradicated. The recommended workflow for this would be:
+
+Step 1: Identify duplicates and do a visual check of entries
+
+Step 2: Understand why duplicates exist and which ones need to be dropped from the dataset
+
+Step 3: Drop the selected duplicates that you want to drop. It is also advisable to document which duplicates were dropped and why
+
+### Identify and Drop duplicates
+
+```{r Duplicates, include=TRUE}
+# Identify and Drop Duplicate Rows (Perfect Duplicates)
+
+  df <- df_raw #resetting dataframe
+  
+# Check for duplicates in the dataset (creates a binary variable for duplicate rows)
+  invisible(
+    duplicated(df)
+    )
+
+# Count number of duplicated variables
+  invisible(
+    sum(duplicated(df))
+    )
+
+# View duplicate observations - visual checks are important understand why the dataset contains duplicates and which ones need to be dropped
+  #View(df[duplicated(df), ])
+  
+# Remove duplicated observations (repeated rows)
+  df <- df[!duplicated(df), ]
+  
+# Identify and Drop Duplicate IDs
+
+  df <- df_raw #resetting dataframe
+  
+# Check for duplicates in the dataset by var1 <insert variable name>
+  invisible(
+    duplicated(df$var1)
+    )
+  
+# Remove identified duplicates by var3 <insert variable name> (in each instance, the first observation is kept)
+  df <- df[!duplicated(df$var3), ]
+```
+
+## Missing Data
+
+### Identify and Deal with Missing Data
+
+Dealing with missing values is subjective and you can find multiple options to do so. The most common is to drop observations with missing values in key variables. You can also impute the missing value in a variable with the mean value for the variable. Imputing is a very subjective and should be considered carefully before taking a decision.
+
+Some useful links with code:
+
+https://towardsdatascience.com/how-to-handle-missing-data-8646b18db0d4
+
+https://towardsdatascience.com/6-different-ways-to-compensate-for-missing-values-data-imputation-with-examples-6022d9ca0779
+
+```{r Missing, include=TRUE}
+
+  df <- df_raw #resetting dataframe  
+
+# Creating a dataframe with counts of missing values for each column
+  na_count <-sapply(df, function(y) sum(length(which(is.na(y)))))
+  na_count <- data.frame(na_count)
+  na_count
+
+# Visualizing missing data in your data frame - helps you visualise relations between variables
+  library(visdat) # Install if not already installed
+  vis_dat(df)
+  
+# Visualize and record % missing values for each variable  
+  vis_miss(df)
+  
+# Drop observations with missing values in a variable
+  df <- df %>% filter(!is.na(var2))
+
+  df <- df_raw #Ignore resetting dataframe  
+  df$var2 <- ifelse(df$var2 > 80, NA, df$var2) # Ignore - cleaning variable
+  
+# Impute Mean Values instead of missing values
+  var2_mean <- mean(df$var2, na.rm = TRUE) # Mode and Median can also be used here, based on subjective interpretation
+  df$var2_imputed <- ifelse(is.na(df$var2), var2_mean, df$var2)
+  
+# Compare distributions of imputed vs. non-imputed variable
+  hist(df$var2, 
+       col=rgb(0,0,1,0.2),
+       xlim=c(0,100),
+       ylim=c(0,400),
+       xlab='Values', 
+       ylab='Frequency', 
+       main='Histogram for comparing imputed vs. non-impuuteud variable distribution')
+  hist(df$var2_imputed, 
+       col=rgb(1,0,0,0.2), 
+       add=TRUE)
+  legend('topright', 
+         c('var2', 'var2_imputed'),
+         fill=c(rgb(0,0,1,0.2), 
+                rgb(1,0,0,0.2)))
+```
+
+## Non-Sensical Entries
+
+### Editing data
+
+In some cases, you might need to edit observation level data for certain variables which have not been entered correctly. Ideally, this should be expected and caught in the HFCs during data collection. This block provides code for dealing with common non-sensical data entries.
+
+```{r non-sensical, include=TRUE}
+# Negative Values
+  
+  df <- df_raw #Ignore resetting dataframe  
+
+# Convert Negative Values to Zero (for any other character, replace the second 0 in the code with the desired character)
+  df$var1 <- ifelse(df$var1 < 0, 0, df$var1)
+
+  df <- df_raw #Ignore resetting dataframe  
+  
+# Convert Negative Values to Missing (for any other character, replace the second 0 in the code with the desired character)
+  df$var1 <- ifelse(df$var1 < 0, NA, df$var1)
+
+# Non-numeric characters in a numeric variable
+  
+  df <- df_raw #Ignore resetting dataframe  
+  df$var4 <- df$ticket # Ignore renaming variable
+  
+  # Replace non-numeric entry with NA (coerce the variable into numeric type)
+  invisible(
+    df$var4 <- lapply(df$var4, function(x) as.numeric(as.character(x)))
+    )
+  
+  df$var4 <- df$ticket # Ignore renaming variable
+  
+  # Remove non-numeric characters from all observation ("x234abc12" -> 23412)
+  df$var4 <- as.numeric(gsub("\\D+", "", df$var4))
+  
+# Change incorrect values that are not answer choices to missings
+  df$survived[df$survived > 1] <- NA
+  
+  df$var4 <- df$ticket # Ignore renaming variable
+  
+# Remove specific string entries in numeric columns [Eg.Remove all A's]
+  df$var4 <- str_remove(df$var4, "A")
+  
+  df$var5 <- df$embarked # Ignore renaming variable
+  
+# Remove unwanted characters from all observations of a variable (removes '\' in the variable)
+  df$var5 <- str_remove_all(df$var5, "\\\\")
+  
+# Replace values in certain observations [Eg. Change all values that are under 20 to 0]
+  df$var1[df$var1 < 20] <- 0
+```
+
+## Merge two datasets
+
+Before merging, ensure that you know the right variable to merge on. The first data frame (df1) is the base and all variables from the same will show first in the merged dataset followed by those selected observations from the second data frame (df2) which map on to the the 'var_id's from df1. 
+
+R's merge() command accommodates all three - one-to-one, one-to-many and many-to-many relationships, which the language manages on it's own. It is advisable to understand both the datasets to be merged properly and understand which join works best for you.
+
+Here's an useful Stack Overflow thread which also defines these joins:
+
+https://stackoverflow.com/questions/1299871/how-to-join-merge-data-frames-inner-outer-left-right#:~:text=Inner%20join%3A%20merge(df1%2C,x%20and%20by.
+
+```{r Merge, include=TRUE}
+# Merge columns of two datasets with tiles df1 and df2 with common variable 'var_id' - Code won't run with the current sample data set
+
+  # df_merged <- merge(df1, df2, by = "var_id") # Inner Join  
+
+  # df_merged <- merge(df1, df2, by = "var_id", all = TRUE) # Outer Join
+
+  # df_merged <- merge(df1, df2, by = "var_id", all.x = TRUE) # Left Join
+
+  # df_merged <- merge(df1, df2, by = "var_id", all.y = TRUE) # Right Join
+
+# Merge columns of two datasets with tiles df1 and df2 with more than one common variable, say 'var_id1', 'var_id2', 'var_id3' - Code won't run with the current sample data set
+
+  # df_merged <- merge(df1, df2, by = c("var_id1","var_id2","var_id3")) # Inner Join  
+
+  # df_merged <- merge(df1, df2, by = c("var_id1","var_id2","var_id3"), all = TRUE) # Outer Join
+
+  # df_merged <- merge(df1, df2, by = c("var_id1","var_id2","var_id3"), all.x = TRUE) # Left Join
+
+  # df_merged <- merge(df1, df2, by = c("var_id1","var_id2","var_id3"), all.y = TRUE) # Right Join
+
+# Appending Rows (used in cases where rows from 2 datasets WITH SAME NAME AND NUMBER OF COLUMNS need to be to added to the same dataset)
+
+  # df_merged <- rbind(df1, df2) 
+```
+
+## Preparing Data for Analysis
+
+### Renaming variables
+
+Create new variables and renaming existing variables (using dplyr)
+
+```{r rename, include=TRUE}
+# Renaming variables by name using rename()
+
+  # df <- rename(new_name = old_name)
+
+# Creating new variables using mutate() from existing variables
+  # df$new_var <- df %>% mutate(new_var = old_var)
+
+# In case of numerical variables, mutate() also supports arithmetic functions
+  # df$new_var <- df %>% mutate(new_var = old_var/2)
+  # df$force <- df %>% mutate(force = mass*accerleration)
+  # df$score <- df %>% mutate(score = (var1 + var2 + var3)/3)
+```
+
+### Recasting variables
+
+Convert variable types
+
+```{r Recast, include=TRUE}
+# Converting variable types (use the desired variable name instead of 'var1')
+
+  df <- df_raw #resetting dataframe
+
+# Numeric to String
+  df$var1 <- as.character(df$var1)
+
+# String to Numeric
+  df$var1 <- as.numeric(df$var1) # Ensure that all string values are numeric before converting
+  
+# Numeric/String to Factor/Categorical
+  # df$var1 <- as.factor(df$var1)
+  
+# Adding labels for the factor
+  invisible(
+    factor(df$var1,levels = c(1,2,3,4,5),
+         labels = c("Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"))
+  )
+```
+
+### Pre-Analysis: Converting Categorical Data to Dummy data for each category
+
+```{r Split, include= TRUE}
+
+# Resetting the dataframe
+
+  df$var5 <- df$embarked # Ignore renaming variable
+
+# Make unordered categorical variable option into dummies for the embarked variable
+# where embarked is the cat variable and  C,S and Q are categories
+  
+  df$var5[df$var5 == ""] <- NA # Replace missing values with NA
+  
+  df$var5_c <- ifelse(df$embarked == "C", 1, 0)
+  df$var5_s <- ifelse(df$embarked == "S", 1, 0)
+  df$var5_q <- ifelse(df$embarked == "Q", 1, 0)
+
+```
+
+### Pre-Analysis: Rename and Standardise Variables
+
+```{r Standardise, include=TRUE}
+# Code to standardise and rename variables for analysis
+  df <- rename(df, siblings_spouses_onboard = sibsp)
+  df <- rename(df, parents_children_onboard = parch)
+  
+# Code to standardize numerical variables
+  
+  var_list <- c('var2', 'var3') # add list of numerical variables to standardize
+  
+  df[,var_list] <- as.data.frame(scale(df[,var_list]))
+```
+
+### Pre-Analysis: Standard Transformations
+
+```{r Transform, include=TRUE}
+# Transform a numerical range variable to a bucketed categorical variable (using example)
+  df$var2_range <- cut(df$var2, 
+                      breaks=c(10,20,30,40,50,60,70,80), 
+                      labels=c("10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79"), 
+                      right=FALSE)
+
+# Natural Logistic Transformation
+  df$var1_log <- log(df$var1)
+  
+# Square Root Transformation Transformation
+  df$var1_sqrt <- sqrt(df$var1)
+
+# Inverse Transformation
+  df$var1_inv <- 1/(df$var1)
+
+```
+
+### Pre-Analysis: Recoding and Labelling Categorical Variables
+
+```{r Recode, include=TRUE}
+## Factorizing and labeling an existing variable var1 to a new variable var1_fac with labeled categories
+  df$var5_fac <- factor(df$var5,
+                        levels = c("C","Q","S"),
+                        labels = c("C", "Q", "S")) 
+  # The first defined level will be the reference class in the regression equation
+
+# Using case_when command to control the number of categories - will not run with current example.
+  # df <- df %>% mutate(education_new = case_when(education == 'Upto Class 1st' ~ 'Secondary and Lower'
+  #                               ,education == 'Upto Class 5th' ~ 'Secondary and Lower'
+  #                               ,education == 'Upto Class 10th' ~ 'Secondary and Lower'
+  #                               ,education == 'Upto Class 12th' ~ 'Senior Secondary'
+  #                               ,education == 'Bachelors' ~ 'Bachelors'
+  #                               ,education == 'Masters' ~ 'Masters'
+  #                               ,education == 'Professional Certificate' ~ 'Professional Certificate'
+  #                               ,education == 'Others' ~ 'Others'))
+  # Set any value after the '~' symbol which suits your need to recode multiple categories as a smaller subset. This example shows how to record all categories under 10th class in to one category labeled 'Secondary and Lower'
+```
+
+## Outliers
+
+Outliers are very subjective. We recommend visual checks on each variable of interest to see if all values fall withiin expected range. Take special note of values which fall +/- 3 SDs away from mean, which can cause issues with parametric tests.
+
+The right answer may not be to drop the outlier but to switch to non-parametric tests. Again, a subjectiive call.
+
+### Visual Checks for Outliers
+
+```{r Outliers_1, include=TRUE}
+# Check if there are outliers in numerical var1 - Histogram
+  hist(df$var1,
+       labels = TRUE)
+
+  ggplot(data = df, aes(x = var1)) +
+    geom_histogram(binwidth = 1, fill = "#0033A1") +
+    theme_bw()
+
+# Check if there are outliers in categorical var5
+  table(df$var5)
+
+  df <- df_raw #Ignore resetting dataframe  
+  df$var2 <- ifelse(df$var2 > 80, NA, df$var2) # Ignore - cleaning variable
+  
+# Inter-quartile range checks - Box Plot
+  ggplot(df) +
+  aes(x = "", y = var2) +
+  geom_boxplot(fill = "#0033A1") +
+  theme_minimal()
+```
+
+### Treating Outliers
+
+```{r Outliers_2, include=TRUE}
+# Dropping observations which fall above or below a certain value
+  
+  X <- 18
+  df <- df %>% filter(var2 > X) # Drop all observations with var1 below a certain level X
+  
+  X <- 60
+  df <- df %>% filter(var2 < X) # Drop all observations with var1 above a certain level X
+  
+# Setting outlier values to missing
+  X <- 60
+  df$var2 <- ifelse(df$var2 > X, NA, df$var2) # setting top-end values to missing, X is the cutoff
+  
+  X <- 18
+  df$var2 <- ifelse(df$var2 < X, NA, df$var2) # setting bottom-end values to missing, X is the cutoff
+
+# Winsorizing variables to contain values within 5%-95% CI around the mean
+  library('DescTools') # install package if not already installed
+  df$var1_win_95_5 <- Winsorize(df$var1, probs=c(0.05, 0.95), na.rm = TRUE) # value under probs can be tweaked to define other margins
+  
+# View Pre and Post Winsorized Data
+  # Compare distributions of imputed vs. non-imputed variable (adjust breaks for graph clarity)
+  hist(df$var1, 
+       col=rgb(0,0,1,0.2),
+       xlim=c(0,600),
+       breaks = 50,
+       ylim=c(0,700),
+       xlab='Values', 
+       ylab='Frequency',
+       main='Histogram to comapre winsorised vs. unchanged variable')
+  hist(df$var1_win_95_5, 
+       col=rgb(1,0,0,0.2), 
+       breaks = 15,
+       add=TRUE)
+  legend('topright', 
+         c('var1', 'var1_win_95_5'),
+         fill=c(rgb(0,0,1,0.2), 
+                rgb(1,0,0,0.2)))
+```
+
+```{r, include = FALSE}
+options(warn = defaultW)
+```
